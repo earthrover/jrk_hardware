@@ -11,9 +11,17 @@
 
 using jrk::Jrk;
 
-Jrk::Jrk(serial::Serial& serial) : _serial(serial){};
+Jrk::Jrk(const std::string port/*=""*/, uint32_t baudrate/*=9600*/, uint32_t timeout/*=0*/)
+  : _serial(new serial::Serial(port, baudrate, serial::Timeout::simpleTimeout(timeout))) {};
+
+Jrk::Jrk(serial::Serial* serial) : _serial(serial){};
 
 Jrk::~Jrk(){};
+
+void Jrk::reset(serial::Serial* serial)
+{
+  _serial.reset(serial);
+}
 
 void Jrk::sendBaudRateIndication()
 {
@@ -22,7 +30,7 @@ void Jrk::sendBaudRateIndication()
 
 void Jrk::motorOff()
 {
-  writeCommand(motorOffCommand);
+  writeByte(motorOffCommand);
 }
 
 void Jrk::setTarget(uint16_t target)
@@ -40,39 +48,20 @@ void Jrk::setTarget(uint16_t target)
   writeBuffer(2);
 }
 
-uint16_t Jrk::getFeedback()
+uint16_t Jrk::get(uint8_t command_byte)
 {
-  writeCommand(getScaledFeedbackCommand);
-
-  return read16BitData();
-}
-
-uint16_t Jrk::getErrors()
-{
-  writeCommand(getErrorsCommand);
-
-  return read16BitData();
-}
-
-uint16_t Jrk::getErrorsHalting()
-{
-  writeCommand(getErrorsHaltingCommand);
+  writeByte(command_byte);
 
   return read16BitData();
 }
 
 void Jrk::writeByte(uint8_t dataByte)
 {
+  #ifdef DEBUG
+    printf(">> writeByte: 0x%02x\n", dataByte);
+  #endif
   _write_buffer[0] = dataByte;
   writeBuffer(1);
-}
-
-void Jrk::writeCommand(uint8_t commandByte)
-{
-  #ifdef DEBUG
-    printf(">> writeCommand: 0x%02x\n", commandByte);
-  #endif
-  writeByte(commandByte);
 }
 
 void Jrk::write7BitData(uint8_t data)
@@ -82,13 +71,13 @@ void Jrk::write7BitData(uint8_t data)
 
 void Jrk::writeBuffer(uint8_t size)
 {
-  _serial.write(_write_buffer, size);
+  _serial->write(_write_buffer, size);
 }
 
 uint16_t Jrk::read16BitData()
 {
   size_t bytes;
-  bytes = _serial.read(_read_buffer, 2);
+  bytes = _serial->read(_read_buffer, 2);
   if (bytes < 2)
   {
     throw JrkTimeout();

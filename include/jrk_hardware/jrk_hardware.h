@@ -10,6 +10,9 @@
 #include "hardware_interface/joint_state_interface.h"
 #include "hardware_interface/robot_hw.h"
 
+#include "diagnostic_msgs/DiagnosticArray.h"
+#include "sensor_msgs/JointState.h"
+
 #include "serial/serial.h"
 
 #include "jrk_hardware/jrk_serial.h"
@@ -17,23 +20,26 @@
 namespace jrk
 {
 
-typedef std::map<std::string, std::string> joints_t;
-
 class JrkHardware : public hardware_interface::RobotHW
 {
 public:
-  JrkHardware(joints_t joints, double conversion_factor);
+  JrkHardware(std::map<std::string, std::string> joints, double conversion_factor);
   virtual ~JrkHardware();
 
-  uint16_t errors();
-  void read();
-  void write();
+  void diagnostics(diagnostic_msgs::DiagnosticArray& diagnostic_array);
+  void read(const ros::Time& time, const ros::Duration& period) override;
+  void write(const ros::Time& time, const ros::Duration& period) override;
+
+  void raw_feedback(sensor_msgs::JointState& joint_state);
+
   void stop();
-  std::string debug();
+  void clear_errors();
 
 private:
   void registerInterfaces();
-  void createDevices(joints_t joints);
+  void createDevices(std::map<std::string, std::string> joints);
+
+  void handle_timeout(std::string joint_name);
 
   inline uint16_t toArb(double physical_units);
   inline double fromArb(uint16_t arb_units);
@@ -41,18 +47,22 @@ private:
   hardware_interface::JointStateInterface joint_state_interface;
   hardware_interface::VelocityJointInterface velocity_joint_interface;
 
-  serial::Timeout timeout = serial::Timeout::simpleTimeout(500);
-  const unsigned long baudrate = 9600;
+  struct Joint
+  {
+    const std::string name;
+    const std::string port;
+    jrk::Jrk jrk;
 
-  size_t num_joints;
-  joints_t joints;
-  std::vector<serial::Serial> serial_devices;
-  std::vector<jrk::Jrk> jrk_devices;
+    uint16_t target, feedback, error;
+    double cmd, pos, vel, eff;
 
-  std::vector<double> cmd;
-  std::vector<double> pos;
-  std::vector<double> vel;
-  std::vector<double> eff;
+    Joint(const std::string name="", const std::string port="", const unsigned long baudrate=9600, const uint32_t timeout=500)
+      : name(name), port(port), jrk(port, baudrate, timeout)
+      , target(2048), feedback(2048), error(1), cmd(0), pos(0), vel(0), eff(0)
+    { }
+  };
+
+  std::vector<std::unique_ptr<Joint> > joints;
 
   double conversion_factor;
 
