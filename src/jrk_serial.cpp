@@ -24,7 +24,7 @@ Jrk::Jrk(serial::Serial* serial) : _serial(serial)
 
 Jrk::~Jrk(){};
 
-Jrk::start()
+void Jrk::start()
 {
   sendBaudRateIndication();
 }
