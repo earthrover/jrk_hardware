@@ -12,15 +12,27 @@
 using jrk::Jrk;
 
 Jrk::Jrk(const std::string port/*=""*/, uint32_t baudrate/*=9600*/, uint32_t timeout/*=0*/)
-  : _serial(new serial::Serial(port, baudrate, serial::Timeout::simpleTimeout(timeout))) {};
+  : _serial(new serial::Serial(port, baudrate, serial::Timeout::simpleTimeout(timeout)))
+{
+  start();
+};
 
-Jrk::Jrk(serial::Serial* serial) : _serial(serial){};
+Jrk::Jrk(serial::Serial* serial) : _serial(serial)
+{
+  start();
+};
 
 Jrk::~Jrk(){};
+
+Jrk::start()
+{
+  sendBaudRateIndication();
+}
 
 void Jrk::reset(serial::Serial* serial)
 {
   _serial.reset(serial);
+  start();
 }
 
 void Jrk::sendBaudRateIndication()
