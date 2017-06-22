@@ -19,6 +19,7 @@ public:
   Jrk(serial::Serial* serial);
   virtual ~Jrk();
 
+  void start();
   void reset(serial::Serial* serial);
 
   void sendBaudRateIndication();
