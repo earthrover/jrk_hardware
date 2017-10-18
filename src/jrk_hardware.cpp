@@ -22,6 +22,7 @@ JrkHardware::JrkHardware(std::map<std::string, std::string> joint_params, double
 
   for (const auto& params : joint_params)
   {
+    ROS_DEBUG_STREAM("creating joint " << params.first << " @ " << params.second);
     joints.emplace_back(new Joint(params.first, params.second));
   }
   registerInterfaces();
@@ -110,6 +111,7 @@ void JrkHardware::raw_feedback(sensor_msgs::JointState& joint_state)
 
 void JrkHardware::read(const ros::Time& time, const ros::Duration& period)
 {
+  /*
   for (auto& j : joints)
   {
     try
@@ -123,6 +125,7 @@ void JrkHardware::read(const ros::Time& time, const ros::Duration& period)
       handle_timeout(j->name, "getting feedback");
     }
   }
+  */
 }
 
 void JrkHardware::write(const ros::Time& time, const ros::Duration& period)
