@@ -4,27 +4,26 @@
 #include <sstream>
 #include <stdexcept>
 
+#include "ros/ros.h"
+
 #include "jrk_hardware/jrk_hardware.h"
 
-using jrk::JrkHardware;
-using std::size_t;
+namespace jrk
+{
 
-JrkHardware::JrkHardware(joints_t joints, double conversion_factor)
-  : joints(joints)
-  , num_joints(joints.size())
-  , serial_devices(num_joints)
-  , cmd(num_joints, 0.0)
-  , pos(num_joints, 0.0)
-  , vel(num_joints, 0.0)
-  , eff(num_joints, 0.0)
+JrkHardware::JrkHardware(std::map<std::string, std::string> joint_params, double conversion_factor)
+  : joints()
   , conversion_factor(conversion_factor)
 {
-  if (num_joints < 1)
+  if (joint_params.size() < 1)
   {
     throw std::invalid_argument("JrkHardware requires at least 1 joint.");
   }
 
-  createDevices(joints);
+  for (const auto& params : joint_params)
+  {
+    joints.emplace_back(new Joint(params.first, params.second));
+  }
   registerInterfaces();
 
   active = true;
@@ -37,96 +36,107 @@ JrkHardware::~JrkHardware()
 
 void JrkHardware::registerInterfaces()
 {
-  size_t i = 0;
-  for (const auto& j : joints)
+  for (auto& j : joints)
   {
-    hardware_interface::JointStateHandle joint_state_handle(j.first, &pos[i], &vel[i], &eff[i]);
+    hardware_interface::JointStateHandle joint_state_handle(j->name, &j->pos, &j->vel, &j->eff);
     joint_state_interface.registerHandle(joint_state_handle);
 
-    hardware_interface::JointHandle joint_handle(joint_state_handle, &cmd[i]);
+    hardware_interface::JointHandle joint_handle(joint_state_handle, &j->cmd);
     velocity_joint_interface.registerHandle(joint_handle);
-
-    i++;
   }
 
   registerInterface(&joint_state_interface);
   registerInterface(&velocity_joint_interface);
 }
 
-void JrkHardware::createDevices(joints_t joints)
-{
-  size_t i = 0;
-  for (const auto& j : joints)
-  {
-    serial_devices[i].setPort(j.second);
-    serial_devices[i].setBaudrate(baudrate);
-    serial_devices[i].setTimeout(timeout);
-    serial_devices[i].open();
-
-    jrk::Jrk jrk(serial_devices[i]);
-    jrk_devices.push_back(jrk);
-
-    i++;
-  }
-}
-
 void JrkHardware::stop()
 {
+  if (!active) return;
   active = false;
-  for(size_t i = 0; i < num_joints; i++)
+  for (auto& j : joints)
   {
-    jrk_devices[i].motorOff();
-  }
-}
-
-uint16_t JrkHardware::errors()
-{
-  try
-  {
-    for(auto& jrk : jrk_devices)
-    {
-      uint16_t err = jrk.getErrorsHalting();
-      if (err && err != 1) // ignore the awaiting command error
-      {
-        stop();
-        return err;
-      }
+    try {
+      j->jrk.motorOff();
+    } catch (const jrk::JrkTimeout&) {
+      handle_timeout(j->name);
     }
-
-    return 0;
   }
-  catch (const jrk::JrkTimeout&)
+  ROS_WARN_STREAM("sending commands to motors has been disabled");
+}
+
+void JrkHardware::handle_timeout(const std::string joint_name)
+{
+  ROS_ERROR_STREAM("joint " << joint_name << " timed out");
+  stop();
+}
+
+void JrkHardware::clear_errors()
+{
+  for(auto& j : joints)
   {
-    stop();
-    return -1;
+    try {
+      j->jrk.setTarget(2048);
+    } catch (const jrk::JrkTimeout&) {
+      handle_timeout(j->name);
+    }
+    // there should be no errors now, otherwise exit
+    if ((j->error = j->jrk.getErrorsHalting()))
+    {
+      ROS_WARN_STREAM("unable to clear errors on joint " << j->name);
+      ROS_WARN_STREAM("sending commands to motors remains disabled");
+      return;
+    }
+    else
+    {
+      ROS_INFO_STREAM("errors cleared on joint " << j->name);
+    }
+  }
+  ROS_INFO("sending commands to motors has been re-enabled");
+  active = true;
+}
+
+void JrkHardware::raw_feedback(sensor_msgs::JointState& joint_state)
+{
+  joint_state.header.stamp = ros::Time::now();
+
+  for (auto& j : joints)
+  {
+    joint_state.name.push_back(j->name);
+    joint_state.velocity.push_back(j->feedback);
   }
 }
 
-void JrkHardware::read()
+void JrkHardware::read(const ros::Time& time, const ros::Duration& period)
 {
-  for(size_t i = 0; i < num_joints; i++)
+  for (auto& j : joints)
   {
     try
     {
-      vel[i] = jrk_devices[i].getFeedback();
+      j->feedback = j->jrk.getFeedback();
+      j->vel = fromArb(j->feedback);
+      j->pos += j->vel * period.toSec();
     }
     catch (const jrk::JrkTimeout&)
     {
-      stop();
+      handle_timeout(j->name);
     }
   }
-
-  return;
 }
 
-void JrkHardware::write()
+void JrkHardware::write(const ros::Time& time, const ros::Duration& period)
 {
   // don't write commands if there is an error
   if (!active) return;
 
-  for (size_t i = 0; i < num_joints; i++)
+  for (auto& j : joints)
   {
-    jrk_devices[i].setTarget(toArb(cmd[i]));
+    try
+    {
+      j->target = toArb(j->cmd);
+      j->jrk.setTarget(j->target);
+    } catch (const jrk::JrkTimeout&) {
+      handle_timeout(j->name);
+    }
   }
 }
 
@@ -140,22 +150,7 @@ inline uint16_t JrkHardware::toArb(double physical_units)
 
 inline double JrkHardware::fromArb(uint16_t arb_units)
 {
-  return ((double)arb_units-2048.0)/conversion_factor;
+  return ((double)arb_units - 2048.0)/conversion_factor;
 }
 
-std::string JrkHardware::debug()
-{
-  std::stringstream ss;
-
-  std::cout << num_joints << std::endl;
-  ss << "Jrk Devices: [" << num_joints << "]{ ";
-
-  for (auto j = joints.cbegin(); j != joints.cend(); ++j)
-  {
-    ss << j->first << " (" << j->second << ")";
-    if (j != joints.cend()) ss << ", ";
-  }
-  ss << " }" << std::endl;
-
-  return ss.str();
-}
+} // namespace jrk

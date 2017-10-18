@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package format="2">
   <name>jrk_hardware</name>
-  <version>0.0.0</version>
-  <description>The jrk_hardware package</description>
+  <version>0.3.0</version>
+  <description>C++ code for controlling Jrk Pololu motor drivers in ros_control.</description>
 
   <maintainer email="laurence.de-bruxelles@stfc.ac.uk">Laurence de Bruxelles</maintainer>
 
