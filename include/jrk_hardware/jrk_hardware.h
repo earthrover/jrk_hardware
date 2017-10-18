@@ -37,7 +37,7 @@ private:
   void registerInterfaces();
   void createDevices(std::map<std::string, std::string> joints);
 
-  void handle_timeout(std::string joint_name);
+  void handle_timeout(std::string joint_name, std::string details = "");
 
   inline uint16_t toArb(double physical_units);
   inline double fromArb(uint16_t arb_units);

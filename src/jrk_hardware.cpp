@@ -58,15 +58,15 @@ void JrkHardware::stop()
     try {
       j->jrk.motorOff();
     } catch (const jrk::JrkTimeout&) {
-      handle_timeout(j->name);
+      handle_timeout(j->name, "sending stop");
     }
   }
   ROS_WARN_STREAM("sending commands to motors has been disabled");
 }
 
-void JrkHardware::handle_timeout(const std::string joint_name)
+void JrkHardware::handle_timeout(const std::string joint_name, std::string details)
 {
-  ROS_ERROR_STREAM("joint " << joint_name << " timed out");
+  ROS_ERROR_STREAM("joint " << joint_name << " timed out " << details);
   stop();
 }
 
@@ -77,7 +77,7 @@ void JrkHardware::clear_errors()
     try {
       j->jrk.setTarget(2048);
     } catch (const jrk::JrkTimeout&) {
-      handle_timeout(j->name);
+      handle_timeout(j->name, "clearing errors");
     }
     // there should be no errors now, otherwise exit
     if ((j->error = j->jrk.getErrorsHalting()))
@@ -120,7 +120,7 @@ void JrkHardware::read(const ros::Time& time, const ros::Duration& period)
     }
     catch (const jrk::JrkTimeout&)
     {
-      handle_timeout(j->name);
+      handle_timeout(j->name, "getting feedback");
     }
   }
 }
@@ -137,7 +137,7 @@ void JrkHardware::write(const ros::Time& time, const ros::Duration& period)
       j->target = toArb(j->cmd);
       j->jrk.setTarget(j->target);
     } catch (const jrk::JrkTimeout&) {
-      handle_timeout(j->name);
+      handle_timeout(j->name, "sending command");
     }
   }
 }
