@@ -104,6 +104,8 @@ void JrkHardware::raw_feedback(sensor_msgs::JointState& joint_state)
     joint_state.name.push_back(j->name);
     joint_state.velocity.push_back(j->feedback);
   }
+
+  return;
 }
 
 void JrkHardware::read(const ros::Time& time, const ros::Duration& period)

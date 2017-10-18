@@ -18,6 +18,7 @@ void controlLoop(jrk::JrkHardware &jrk,
                  ros::Rate control_rate,
                  realtime_tools::RealtimePublisher<sensor_msgs::JointState>* feedback_pub)
 {
+  uint8_t counter = 0;
   ros::Time prev_time = ros::Time::now();
 
   while(ros::ok())
@@ -61,8 +62,11 @@ int main(int argc, char *argv[])
   ros::init(argc, argv, "jrk_hardware_node");
   ros::NodeHandle nh, private_nh("~");
 
-  double control_frequency, conversion_factor;
+  auto diagnostics_pub = new realtime_tools::RealtimePublisher<diagnostic_msgs::DiagnosticArray>(nh, "diagnostics", 10);
+
+  double control_frequency, diagnostic_frequency, conversion_factor;
   private_nh.param<double>("control_frequency", control_frequency, 10.0);
+  private_nh.param<double>("diagnostic_frequency", diagnostic_frequency, 1.0);
   private_nh.param<double>("conversion_factor", conversion_factor, 2048.0);
 
   bool publish_feedback;
