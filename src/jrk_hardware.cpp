@@ -48,6 +48,7 @@ namespace jrk
     {
         for (auto& j : joints)
         {
+			printf("+ Registering Interfaces %s\n", j->name.c_str());
             hardware_interface::JointStateHandle joint_state_handle(j->name, &j->pos, &j->vel, &j->eff);
             joint_state_interface.registerHandle(joint_state_handle);
 
