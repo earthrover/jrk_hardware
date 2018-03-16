@@ -139,7 +139,7 @@ namespace jrk
 		for (auto& j : joints)
 		{
 			try {
-				j->jrk.setTarget(2048);
+				j->jrk.setTarget(2047);
 			}
 			catch (const jrk::JrkTimeout&) {
 				handle_timeout(j->name, "clearing errors");
@@ -183,17 +183,21 @@ namespace jrk
 			try
 			{
 				j->feedback = j->jrk.getFeedback();
-				j->vel = fromArb(j->feedback);
-				j->pos += j->vel * period.toSec();
+
+				if (strstr(j->name.c_str(), "steering") == NULL) {
+					j->vel = fromArb(j->feedback);
+					j->pos += j->vel * period.toSec();
+				}
 
 				float feed = abs(joints_[t].feedback - j->feedback);
+
+				joints_[t].velocity = j->vel;
+				joints_[t].position = j->pos;
+				joints_[t].feedback = j->feedback;
 
 				// We have some sensors not connected while testing so lets filter floating sensors
 				if (feed > 50) {
 					debug_output = true;
-					joints_[t].feedback = j->feedback;
-					joints_[t].velocity = j->vel;
-					joints_[t].position = j->pos;
 				}
 			}
 			catch (const jrk::JrkTimeout&)
@@ -234,7 +238,7 @@ namespace jrk
 
 	inline uint16_t JrkHardware::toArb(double physical_units)
 	{
-		int16_t v = (int16_t)std::floor(physical_units*conversion_factor) + 2048;
+		int16_t v = (int16_t)std::floor(physical_units*conversion_factor) + 2047;
 		// clamp TODO find a way to optomise this
 		uint16_t arb = (v < 0) ? 0 : (4095 < v) ? 4095 : v;
 		return arb;
@@ -242,7 +246,7 @@ namespace jrk
 
 	inline double JrkHardware::fromArb(uint16_t arb_units)
 	{
-		return ((double)arb_units - 2048.0) / conversion_factor;
+		return ((double)arb_units - 2047.0) / conversion_factor;
 	}
 
 } // namespace jrk
