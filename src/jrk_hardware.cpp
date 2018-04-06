@@ -51,65 +51,49 @@ namespace jrk
 
 	void JrkHardware::registerInterfaces()
 	{
-		/*
-		std::vector<std::string> velocity_joints_name = {
-			"front_left_wheel_joint", "front_right_wheel_joint",
-			"back_left_wheel_joint", "back_right_wheel_joint" };
-
-		// Connect and register the joint state and velocity interface
-		for (unsigned int i = 0; i < velocity_joints_name.size(); ++i)
-		{
-
-			hardware_interface::JointStateHandle state_handle(velocity_joints_name[i], &joints_[i].position, &joints_[i].velocity, &joints_[i].effort);
-			joint_state_interface.registerHandle(state_handle);
-
-			hardware_interface::JointHandle vel_handle(state_handle, &joints_[i].velocity_command);
-			position_joint_interface.registerHandle(vel_handle);
-		}
-
-		std::vector<std::string> position_joints_name = {
-			"front_left_steering_joint", "front_right_steering_joint",
-			"back_left_steering_joint", "back_right_steering_joint" };
-
-		// Connect and register the joint state and position interface
-		for (unsigned int i = 0; i < position_joints_name.size(); ++i)
-		{
-			hardware_interface::JointStateHandle state_handle(position_joints_name[i], &steering_joints_[i].position, &steering_joints_[i].velocity, &steering_joints_[i].effort);
-			joint_state_interface.registerHandle(state_handle);
-
-			hardware_interface::JointHandle pos_handle(state_handle, &steering_joints_[i].position_command);
-			position_joint_interface.registerHandle(pos_handle);
-		}
-
-		printf("+ Joint State Interface 0x%p \n", &joint_state_interface);
-		registerInterface(&joint_state_interface);
-
-		printf("+ Velocity Interface 0x%p \n", &velocity_joint_interface);
-		registerInterface(&velocity_joint_interface);
-
-
-		printf("+ Position Interface 0x%p \n", &position_joint_interface);
-		registerInterface(&position_joint_interface);
-		*/
-
 		for (auto& j : joints)
 		{
 			printf("+ Registering Interfaces %s\n", j->name.c_str());
 			hardware_interface::JointStateHandle joint_state_handle(j->name, &j->pos, &j->vel, &j->eff);
 			joint_state_interface.registerHandle(joint_state_handle);
 
-			hardware_interface::JointHandle joint_handle_velocity(joint_state_handle, &j->cmd);
-			velocity_joint_interface.registerHandle(joint_handle_velocity);
-
-			// Handle to control the joint position
-			// following setup at [https://github.com/ros-controls/ros_control/wiki/hardware_interface]
-			hardware_interface::JointHandle joint_handle_position(joint_state_handle, &j->cmd);
-			position_joint_interface.registerHandle(joint_handle_position);
+			if (strstr(j->name.c_str(), "steering") == NULL) {
+				hardware_interface::JointHandle joint_handle_velocity(joint_state_handle, &j->cmd);
+				velocity_joint_interface.registerHandle(joint_handle_velocity);
+			} else {
+				// Handle to control the joint position
+				// following setup at [https://github.com/ros-controls/ros_control/wiki/hardware_interface]
+				hardware_interface::JointHandle joint_handle_position(joint_state_handle, &j->cmd);
+				position_joint_interface.registerHandle(joint_handle_position);
+			}
 		}
 
 		registerInterface(&joint_state_interface);
 		registerInterface(&velocity_joint_interface);
 		registerInterface(&position_joint_interface);
+
+        /*
+		for (auto& j : joints)
+		{            
+			serial::Timeout timeout = j->jrk.getTimeout();
+
+			printf("-------------- [%s] -----------------\n", j->name.c_str());
+			printf(" Number of milliseconds between bytes received to timeout on:\n");
+			printf(" [%d]", timeout.inter_byte_timeout);
+
+			printf(" A constant number of milliseconds to wait after calling read. \n");
+			printf(" [%d]", timeout.read_timeout_constant);
+
+			printf(" A multiplier against the number of requested bytes to wait after calling read. \n");
+			printf(" [%d]", timeout.read_timeout_multiplier);
+
+			printf(" A constant number of milliseconds to wait after calling write. \n");
+			printf(" [%d]", timeout.write_timeout_constant);
+
+			printf(" A multiplier against the number of requested bytes to wait after calling write. \n");
+			printf(" [%d]", timeout.write_timeout_multiplier);
+		}
+        */
 	}
 
 	void JrkHardware::stop()
@@ -211,34 +195,65 @@ namespace jrk
 		if (debug_output) {
 			printf("------------- READ --------------\n");
 
+            FILE * fp;
+            fp = fopen ("/home/earth/earth_read.txt", "w+");            
+   
 			for (auto& j : joints)
 			{
-				printf("[%s] Feedback=[%d] Vel=[%2.2f] Pos=[%2.2f]\n", j->name.c_str(), j->feedback, j->vel, j->pos);
+				printf("[%10s] Feedback=[%d] Vel=[%2.2f] Pos=[%2.2f]\n", j->name.c_str(), j->feedback, j->vel, j->pos);
+                if (fp) {
+                    fprintf(fp, "[%10s] Feedback=[%d] Vel=[%2.2f] Pos=[%2.2f]\n", j->name.c_str(), j->feedback, j->vel, j->pos);
+                }
 			}
+            
+            fclose(fp);
 		}
 	}
 
 	void JrkHardware::write(const ros::Time& time, const ros::Duration& period)
 	{
+		static unsigned int value = 0;
+
 		// don't write commands if there is an error
 		if (!active) return;
 
+        bool output_debug =  false;
 		for (auto& j : joints)
 		{
 			try
 			{
-				j->target = toArb(j->cmd);
+				if (strstr(j->name.c_str(), "steering") == NULL) {
+					j->target = toArb(j->cmd / 8.33f);
+				} else {
+					j->target = toArb(j->cmd);
+				}
+
+                if (j->target != 2047) {
+                    output_debug = true;
+                }
+                
 				j->jrk.setTarget(j->target);
 			}
 			catch (const jrk::JrkTimeout&) {
 				handle_timeout(j->name, "sending command");
 			}
 		}
+
+		if (output_debug && (value%10) == 0) {
+			printf("------------- WRITE %d --------------\n", value);
+
+			for (auto& j : joints)
+			{
+				printf("[%10s] Target [%d] [%2.2f] \n", j->name.c_str(), j->target, j->cmd);
+			}
+		}
+
+		value++;
 	}
 
 	inline uint16_t JrkHardware::toArb(double physical_units)
 	{
-		int16_t v = (int16_t)std::floor(physical_units*conversion_factor) + 2047;
+		int16_t v = (int16_t) std::floor(physical_units*conversion_factor) + 2047;
 		// clamp TODO find a way to optomise this
 		uint16_t arb = (v < 0) ? 0 : (4095 < v) ? 4095 : v;
 		return arb;

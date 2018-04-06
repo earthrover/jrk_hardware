@@ -94,8 +94,7 @@ int main(int argc, char *argv[])
 	jrk::JrkHardware jrk(joints, conversion_factor);
 	controller_manager::ControllerManager cm(&jrk, nh);
 
-	printf("------------------ RobotHW 0x%p -------------------\n", &jrk);
-	printf("------------- ControllerManager 0x%p -------------------\n", &cm);
+	printf(" Conversion factor %2.2f \n", conversion_factor);
 
 	ros::Rate control_rate(control_frequency);
 
