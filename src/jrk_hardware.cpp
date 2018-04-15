@@ -437,7 +437,7 @@ inline double JrkHardware::fromArb(uint16_t arb_units)
 				joints_[t].feedback = j->feedback;
 
 				// We have some sensors not connected while testing so lets filter floating sensors
-				if (feed > 50) {
+				if (feed > 10) {
 					debug_output = true;
 				}
 			}
