@@ -41,12 +41,20 @@ namespace jrk
 			int feedback;
 			double position_command;
 
-			SteeringJoint() : position(0), velocity(0), effort(0), position_command(0) { }
+			float center;
+			float min_pos;
+			float max_pos;
+
+			SteeringJoint() : position(0), velocity(0), effort(0), position_command(0), center(2047), min_pos(0), max_pos(4096) { }
 		} steering_joints_[4];
 
 	public:
 
-		JrkHardware(std::map<std::string, std::string> joints, double conversion_factor);
+		JrkHardware(std::map<std::string, std::string> joints, double conversion_factor,
+			float front_left_center, float back_left_center, float front_right_center, float back_right_center,
+			float front_left_max, float back_left_max, float front_right_max, float back_right_max,
+			float front_left_min, float back_left_min, float front_right_min, float back_right_min
+		);
 		virtual ~JrkHardware();
 
 		void read(const ros::Time& time, const ros::Duration& period) override;
@@ -80,10 +88,12 @@ namespace jrk
 
 			uint16_t target, feedback, error;
 			double cmd, pos, vel, eff;
+			double min_, max_, center_;
 
-			Joint(const std::string name = "", const std::string port = "", const unsigned long baudrate = 9600, const uint32_t timeout = 500)
+			Joint(const std::string name = "", const std::string port = "", const double min_pos = 0, const double max_pos = 4096, const double center_pos = 2048,
+				const unsigned long baudrate = 9600, const uint32_t timeout = 500)
 				: name(name), port(port), jrk(port, baudrate, timeout)
-				, target(2048), feedback(2048), error(1), cmd(0), pos(0), vel(0), eff(0)
+				, target(2048), feedback(2048), error(1), cmd(0), pos(0), vel(0), eff(0), min_(min_pos), max_(max_pos), center_(center_pos)
 			{ }
 		};
 

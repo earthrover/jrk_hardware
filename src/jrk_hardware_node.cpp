@@ -67,18 +67,35 @@ int main(int argc, char *argv[])
 
 	double control_frequency, diagnostic_frequency, conversion_factor;
 
-	double front_left_offset, back_left_offset;
-	double front_right_offset, back_right_offset;
+	double front_left_center, back_left_center;
+	double front_right_center, back_right_center;
 
 	private_nh.param<double>("control_frequency", control_frequency, 15.0);
 	private_nh.param<double>("diagnostic_frequency", diagnostic_frequency, 1.0);
 	private_nh.param<double>("conversion_factor", conversion_factor, 2048.0);
 
-	private_nh.param<double>("front_left_steering_offset", front_left_offset, 0.0);
-	private_nh.param<double>("front_right_steering_offset", back_left_offset, 0.0);
+	// TODO: Read this properly and send it in a structure
 
-	private_nh.param<double>("back_left_steering_offset", front_right_offset, 0.0);
-	private_nh.param<double>("back_right_steering_offset", back_right_offset, 0.0);
+	private_nh.param<double>("front_left_steering_center",  front_left_center, 2047);
+	private_nh.param<double>("front_right_steering_center", front_right_center, 2047);
+	private_nh.param<double>("back_left_steering_center",   back_left_center, 2047);
+	private_nh.param<double>("back_right_steering_center",  back_right_center, 2047);
+
+	double front_left_min, back_left_min;
+	double front_right_min, back_right_min;
+
+	private_nh.param<double>("front_left_steering_min",  front_left_min, 0.0);
+	private_nh.param<double>("front_right_steering_min", front_right_min, 0.0);
+	private_nh.param<double>("back_left_steering_min",   back_left_min, 0.0);
+	private_nh.param<double>("back_right_steering_min",  back_right_min, 0.0);
+
+	double front_left_max, back_left_max;
+	double front_right_max, back_right_max;
+
+	private_nh.param<double>("front_left_steering_max",  front_left_max, 4096);
+	private_nh.param<double>("front_right_steering_max", front_right_max, 4096);
+	private_nh.param<double>("back_left_steering_max",   back_left_max, 4096);
+	private_nh.param<double>("back_right_steering_max",  back_right_max, 4096);
 
 	bool publish_feedback;
 	private_nh.param<bool>("publish_raw_feedback", false);
@@ -101,7 +118,11 @@ int main(int argc, char *argv[])
 
 	ROS_DEBUG_STREAM("Creating JrkHardware with " << joints.size() << " joints.");
 
-	jrk::JrkHardware jrk(joints, conversion_factor);
+	jrk::JrkHardware jrk(joints, conversion_factor,
+		front_left_center, back_left_center, front_right_center, back_right_center,
+		front_left_max, back_left_max, front_right_max, back_right_max,
+		front_left_min, back_left_min, front_right_min, back_right_min);
+
 	controller_manager::ControllerManager cm(&jrk, nh);
 
 	printf(" Conversion factor %2.2f \n", conversion_factor);
