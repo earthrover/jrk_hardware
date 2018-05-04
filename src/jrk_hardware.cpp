@@ -276,7 +276,7 @@ void JrkHardware::write(const ros::Time& time, const ros::Duration& period)
                 j->target = toArb(j->cmd / 8.33f);
 
                 if (rotate_in_place != 0) {
-                    if (strstr(j->name.c_str(), "left")) {
+                    if (strstr(j->name.c_str(), "right")) {
                         j->target = 4095 - j->target ;
                     }
                 }
