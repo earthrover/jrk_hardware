@@ -98,7 +98,7 @@ int main(int argc, char *argv[])
 	private_nh.param<double>("back_right_steering_max",  back_right_max, 4096);
 
 	bool publish_feedback;
-	private_nh.param<bool>("publish_raw_feedback", false);
+	private_nh.param<bool>("publish_raw_feedback", publish_feedback, false);
 	realtime_tools::RealtimePublisher<sensor_msgs::JointState>* feedback_pub;
 	if (publish_feedback)
 	{
@@ -137,6 +137,7 @@ int main(int argc, char *argv[])
 	ROS_INFO_STREAM("Starting the jrk_hardware control loop.");
 	if (publish_feedback)
 	{
+		ROS_INFO_STREAM("USING FEEDBACK LOOP");
 		controlLoop(jrk, cm, control_rate, feedback_pub);
 	}
 	else
