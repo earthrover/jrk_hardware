@@ -13,6 +13,9 @@
 
 #include "diagnostic_msgs/DiagnosticArray.h"
 
+#define JOINT_STATE_PUBLISH_FEEDBACK "/jrk_hardware/joints_raw_feedback"
+//#define JOINT_STATE_PUBLISH_FEEDBACK "/joint_states"
+
 void controlLoop(jrk::JrkHardware &jrk,
 	controller_manager::ControllerManager &cm,
 	ros::Rate control_rate,
@@ -21,6 +24,7 @@ void controlLoop(jrk::JrkHardware &jrk,
 	uint8_t counter = 0;
 	ros::Time prev_time = ros::Time::now();
 
+    int count = 0;
 	while (ros::ok())
 	{
 		// Calculate monotonic time difference
@@ -36,7 +40,7 @@ void controlLoop(jrk::JrkHardware &jrk,
 		const auto write_start = ros::Time::now();
 		jrk.write(time, elapsed);
 
-		if (feedback_pub)
+		if (feedback_pub && (count++ % 10) == 0)
 		{
 			if (feedback_pub->trylock())
 			{
@@ -47,6 +51,7 @@ void controlLoop(jrk::JrkHardware &jrk,
 			{
 				ROS_WARN("could not acquire lock, feedback is still publishing");
 			}
+
 		}
 
 		// sleep
@@ -59,7 +64,7 @@ void controlLoop(jrk::JrkHardware &jrk,
 
 int main(int argc, char *argv[])
 {
-	printf("------------------ MAIN JRK_HARDWARE_NODE -------------------\n");
+	printf("------------------ MAIN JRK_HARDWARE_NODE " __DATE__ " " __TIME__ "-------------------\n");
 	ros::init(argc, argv, "jrk_hardware_node");
 	ros::NodeHandle nh, private_nh("~");
 
@@ -99,10 +104,13 @@ int main(int argc, char *argv[])
 
 	bool publish_feedback;
 	private_nh.param<bool>("publish_raw_feedback", publish_feedback, false);
+
+	int publish_feedback_rate;
+	private_nh.param<int>("publish_feedback_rate", publish_feedback_rate, control_frequency);
 	realtime_tools::RealtimePublisher<sensor_msgs::JointState>* feedback_pub;
 	if (publish_feedback)
 	{
-		feedback_pub = new realtime_tools::RealtimePublisher<sensor_msgs::JointState>(nh, "raw_feedback", 10);
+		feedback_pub = new realtime_tools::RealtimePublisher<sensor_msgs::JointState>(nh, JOINT_STATE_PUBLISH_FEEDBACK, publish_feedback_rate);
 	}
 
 	std::map<std::string, std::string> joints;
