@@ -170,6 +170,12 @@ void JrkHardware::raw_feedback(sensor_msgs::JointState& joint_state)
 #ifdef DEBUG
 	printf("-------------- Publish %d -------------------\n", ros::Time::now().sec);
 #endif
+
+	joint_state.name.clear();
+	joint_state.position.clear();
+	joint_state.velocity.clear();
+	joint_state.effort.clear();
+
 	for (auto& j : joints)
 	{
 #ifdef DEBUG

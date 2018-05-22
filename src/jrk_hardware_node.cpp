@@ -24,7 +24,6 @@ void controlLoop(jrk::JrkHardware &jrk,
 	uint8_t counter = 0;
 	ros::Time prev_time = ros::Time::now();
 
-    int count = 0;
 	while (ros::ok())
 	{
 		// Calculate monotonic time difference
@@ -40,7 +39,7 @@ void controlLoop(jrk::JrkHardware &jrk,
 		const auto write_start = ros::Time::now();
 		jrk.write(time, elapsed);
 
-		if (feedback_pub && (count++ % 10) == 0)
+		if (feedback_pub) 
 		{
 			if (feedback_pub->trylock())
 			{
@@ -51,7 +50,6 @@ void controlLoop(jrk::JrkHardware &jrk,
 			{
 				ROS_WARN("could not acquire lock, feedback is still publishing");
 			}
-
 		}
 
 		// sleep
@@ -110,7 +108,7 @@ int main(int argc, char *argv[])
 	realtime_tools::RealtimePublisher<sensor_msgs::JointState>* feedback_pub;
 	if (publish_feedback)
 	{
-		feedback_pub = new realtime_tools::RealtimePublisher<sensor_msgs::JointState>(nh, JOINT_STATE_PUBLISH_FEEDBACK, publish_feedback_rate);
+		feedback_pub = new realtime_tools::RealtimePublisher<sensor_msgs::JointState>(nh, JOINT_STATE_PUBLISH_FEEDBACK, 1); // Queue Size
 	}
 
 	std::map<std::string, std::string> joints;
