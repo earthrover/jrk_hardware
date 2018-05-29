@@ -54,7 +54,7 @@ namespace jrk
 			float front_left_center, float back_left_center, float front_right_center, float back_right_center,
 			float front_left_max, float back_left_max, float front_right_max, float back_right_max,
 			float front_left_min, float back_left_min, float front_right_min, float back_right_min
-		);
+			);
 		virtual ~JrkHardware();
 
 		void read(const ros::Time& time, const ros::Duration& period) override;
