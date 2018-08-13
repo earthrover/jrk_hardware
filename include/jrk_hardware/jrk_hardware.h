@@ -53,7 +53,8 @@ namespace jrk
 		JrkHardware(std::map<std::string, std::string> joints, double conversion_factor,
 			float front_left_center, float back_left_center, float front_right_center, float back_right_center,
 			float front_left_max, float back_left_max, float front_right_max, float back_right_max,
-			float front_left_min, float back_left_min, float front_right_min, float back_right_min
+			float front_left_min, float back_left_min, float front_right_min, float back_right_min,
+			bool hardware_pwm_steering
 			);
 		virtual ~JrkHardware();
 
@@ -84,17 +85,17 @@ namespace jrk
 		{
 			const std::string name;
 			const std::string port;
-			jrk::Jrk jrk;
+
+			bool is_pololu;
+			int id_hardware;
+			jrk::Jrk *jrk;
 
 			uint16_t target, feedback, error;
 			double cmd, pos, vel, eff;
 			double min_, max_, center_;
 
 			Joint(const std::string name = "", const std::string port = "", const double min_pos = 0, const double max_pos = 4096, const double center_pos = 2048,
-				const unsigned long baudrate = 9600, const uint32_t timeout = 500)
-				: name(name), port(port), jrk(port, baudrate, timeout)
-				, target(2048), feedback(2048), error(1), cmd(0), pos(0), vel(0), eff(0), min_(min_pos), max_(max_pos), center_(center_pos)
-			{ }
+				const unsigned long baudrate = 9600, const uint32_t timeout = 500);
 		};
 
 		std::vector<std::unique_ptr<Joint> > joints;

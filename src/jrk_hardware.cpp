@@ -18,10 +18,42 @@ const char *get_robot_name() {
 
 int rotate_in_place = 0;
 
+jrk::Jrk *hardware_steering = NULL;
+
+jrk::JrkHardware::Joint::Joint(const std::string name, const std::string port, const double min_pos, const double max_pos, const double center_pos,
+	const unsigned long baudrate, const uint32_t timeout)
+	: name(name), port(port)
+	, target(2048), feedback(2048), error(1), cmd(0), pos(0), vel(0), eff(0), min_(min_pos), max_(max_pos), center_(center_pos), id_hardware(0), is_pololu(true)
+{
+	size_t len = port.length();
+	const char *prt = port.c_str();
+
+	// We are loooking for the hardware ID to specify if we are going to pack the packages into one.
+	if (prt[len - 2] == '&') {
+		std::string new_port = port.substr(0, len - 2);
+		std::string id = port.substr(len - 1, 1);
+		printf(" Port %s ID %s \n", new_port.c_str(), id.c_str());
+
+		if (hardware_steering == NULL)
+		{
+			printf(" New port ");
+            jrk = new jrk::Jrk(new_port, 115200, timeout);
+		}
+		else {
+			printf(" Reusing port %s \n", new_port.c_str());
+			jrk = hardware_steering;
+		}
+	}
+	else {
+		jrk = new jrk::Jrk(port, baudrate, timeout);
+	}
+}
+
 JrkHardware::JrkHardware(std::map<std::string, std::string> joint_params, double conversion_factor,
 	float front_left_center, float back_left_center, float front_right_center, float back_right_center,
 	float front_left_max, float back_left_max, float front_right_max, float back_right_max,
-	float front_left_min, float back_left_min, float front_right_min, float back_right_min)
+	float front_left_min, float back_left_min, float front_right_min, float back_right_min,
+	bool hardware_pwm_steering)
 	: joints()
 	, conversion_factor(conversion_factor)
 {
@@ -38,6 +70,10 @@ JrkHardware::JrkHardware(std::map<std::string, std::string> joint_params, double
 			double min_ = 0;
 			double max_ = 4096;
 			double center_ = 2048;
+
+			if (hardware_pwm_steering) {
+
+			}
 
 			printf("+ Build joint [%s] [%s]\n", params.first.c_str(), params.second.c_str());
 			ROS_DEBUG_STREAM("creating joint " << params.first << " @ " << params.second);
@@ -70,7 +106,8 @@ JrkHardware::JrkHardware(std::map<std::string, std::string> joint_params, double
 				printf("+ Back Right MIN %2.0f MAX %2.0f, CENTER %2.0f \n", min_, max_, center_);
 			}
 
-			joints.emplace_back(new Joint(params.first, params.second, min_, max_, center_));
+			Joint *joint = new Joint(params.first, params.second, min_, max_, center_);
+			joints.emplace_back(joint);
 		}
 		catch (const std::exception &e) {
 			printf("! Hardware Exception opening [%s] => [%s]\n", params.first.c_str(), params.second.c_str());
@@ -122,7 +159,7 @@ void JrkHardware::stop()
 	for (auto& j : joints)
 	{
 		try {
-			j->jrk.motorOff();
+			j->jrk->motorOff();
 		}
 		catch (const jrk::JrkTimeout&) {
 			handle_timeout(j->name, "sending stop");
@@ -142,13 +179,13 @@ void JrkHardware::clear_errors()
 	for (auto& j : joints)
 	{
 		try {
-			j->jrk.setTarget(2047);
+			j->jrk->setTarget(2048);
 		}
 		catch (const jrk::JrkTimeout&) {
 			handle_timeout(j->name, "clearing errors");
 		}
 		// there should be no errors now, otherwise exit
-		if ((j->error = j->jrk.getErrorsHalting()))
+		if ((j->error = j->jrk->getErrorsHalting()))
 		{
 			ROS_WARN_STREAM("unable to clear errors on joint " << j->name);
 			ROS_WARN_STREAM("sending commands to motors remains disabled");
@@ -207,7 +244,7 @@ void JrkHardware::read(const ros::Time& time, const ros::Duration& period)
 	{
 		try
 		{
-			j->feedback = j->jrk.getFeedback();
+			j->feedback = j->jrk->getFeedback();
 
 			if (strstr(j->name.c_str(), "steering") == NULL) {
 				j->vel = fromArb(j->feedback);
@@ -327,12 +364,14 @@ void JrkHardware::write(const ros::Time& time, const ros::Duration& period)
 			}
 
 #ifdef DEBUG
-			if (j->target != 2047) {
+			if (j->target != 2048) {
 				output_debug = true;
 			}
 #endif
-
-			j->jrk.setTarget(j->target);
+#ifdef DEBUG_PWM
+            printf(" Set target %s\n", j->name.c_str());
+#endif
+			j->jrk->setTarget(j->target);
 		}
 		catch (const jrk::JrkTimeout&) {
 			handle_timeout(j->name, "sending command");
@@ -356,7 +395,7 @@ void JrkHardware::write(const ros::Time& time, const ros::Duration& period)
 
 inline uint16_t JrkHardware::toArb(double physical_units)
 {
-	int16_t v = (int16_t)std::floor(physical_units*conversion_factor) + 2047;
+	int16_t v = (int16_t)std::floor(physical_units*conversion_factor) + 2048;
 	// clamp TODO find a way to optomise this
 	uint16_t arb = (v < 0) ? 0 : (4095 < v) ? 4095 : v;
 	return arb;
@@ -364,6 +403,6 @@ inline uint16_t JrkHardware::toArb(double physical_units)
 
 inline double JrkHardware::fromArb(uint16_t arb_units)
 {
-	return ((double)arb_units - 2047.0) / conversion_factor;
+	return ((double)arb_units - 2048.0) / conversion_factor;
 }
 

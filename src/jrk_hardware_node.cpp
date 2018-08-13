@@ -39,7 +39,7 @@ void controlLoop(jrk::JrkHardware &jrk,
 		const auto write_start = ros::Time::now();
 		jrk.write(time, elapsed);
 
-		if (feedback_pub) 
+		if (feedback_pub)
 		{
 			if (feedback_pub->trylock())
 			{
@@ -103,6 +103,10 @@ int main(int argc, char *argv[])
 	bool publish_feedback;
 	private_nh.param<bool>("publish_raw_feedback", publish_feedback, false);
 
+	// Hardware steering will output the contents of the steering into a central device and packages will contain an ID for the hardware to understand
+	bool hardware_pwm_steering;
+	private_nh.param<bool>("hardware_pwm_steering", hardware_pwm_steering, false);
+
 	int publish_feedback_rate;
 	private_nh.param<int>("publish_feedback_rate", publish_feedback_rate, control_frequency);
 	realtime_tools::RealtimePublisher<sensor_msgs::JointState>* feedback_pub;
@@ -127,7 +131,8 @@ int main(int argc, char *argv[])
 	jrk::JrkHardware jrk(joints, conversion_factor,
 		front_left_center, back_left_center, front_right_center, back_right_center,
 		front_left_max, back_left_max, front_right_max, back_right_max,
-		front_left_min, back_left_min, front_right_min, back_right_min);
+		front_left_min, back_left_min, front_right_min, back_right_min,
+		hardware_pwm_steering);
 
 	controller_manager::ControllerManager cm(&jrk, nh);
 
