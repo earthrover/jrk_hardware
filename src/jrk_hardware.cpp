@@ -297,18 +297,25 @@ void JrkHardware::write(const ros::Time& time, const ros::Duration& period)
 	static unsigned int value = 0;
 
 	// don't write commands if there is an error
-	if (!active) return;
+    if (!active) {
+        printf("!!!ERROR!!!\n");
+        return;
+    }
 
 	bool output_debug = false;
 
-	if ((value % 10) == 0) {
+	if ((value % 1) == 0) {
+        // Hack debugging, we create files on disk for different purposes
+        if (access("/home/earth/debug.txt", F_OK) != -1)
+            output_debug = true;
+        else
+            output_debug = false;
+
 		if (access("/home/earth/rotate.txt", F_OK) != -1) {
-			if (rotate_in_place == 0) {
-				printf("!!!ROTATE!!!\n");
-			}
+			if (rotate_in_place == 0)
+				printf("!!! ROTATE !!!\n");
 			rotate_in_place = 1;
-		}
-		else {
+		} else {
 			rotate_in_place = 0;
 		}
 	}
@@ -363,22 +370,20 @@ void JrkHardware::write(const ros::Time& time, const ros::Duration& period)
 
 			}
 
-#ifdef DEBUG
-			if (j->target != 2048) {
-				output_debug = true;
-			}
-#endif
+            if (j->target != 2048) {
+                output_debug = true;
+            }
+
 #ifdef DEBUG_PWM
             printf(" Set target %s\n", j->name.c_str());
 #endif
 			j->jrk->setTarget(j->target);
-		}
-		catch (const jrk::JrkTimeout&) {
+
+		} catch (const jrk::JrkTimeout&) {
 			handle_timeout(j->name, "sending command");
 		}
 	}
 
-#ifdef DEBUG
 	if (output_debug && (value % 100) == 0) {
 		printf("------------- WRITE %d --------------\n", value);
 
@@ -389,8 +394,6 @@ void JrkHardware::write(const ros::Time& time, const ros::Duration& period)
 	}
 
 	value++;
-#endif
-
 }
 
 inline uint16_t JrkHardware::toArb(double physical_units)
